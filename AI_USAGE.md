@@ -27,6 +27,28 @@
 - Keep each outcome in a reviewable pull request targeting `main`; do not merge
   pull requests unless explicitly instructed.
 
+## Agentic workflow design
+
+- Before implementation, I asked Codex to synthesize the three normative
+  contracts into a repository-root `AGENTS.md`. This was deliberate context
+  engineering, not a replacement for the source documents: the file explicitly
+  makes those documents authoritative and turns their invariants, API promises,
+  failure boundaries, and verification expectations into persistent guidance
+  for every subsequent agent turn.
+- Keeping this guidance in the repository reduced prompt drift across fresh
+  branches and long-running work. It also made constraints such as opaque boot
+  IDs, `(generation, sequence)` ordering, post-commit publication, bounded
+  client memory, and data-preserving migrations visible at the point where AI
+  generated or reviewed code.
+- I directed Codex in short, auditable stages: read contracts, write one focused
+  regression, observe the expected failure, explain the root cause, apply the
+  smallest repair, run focused and full verification, inspect the diff, then
+  publish a single-purpose pull request. I retained responsibility for scope
+  choices, challenged ambiguous suggestions, and controlled every merge.
+- Each later pull request was rebased onto the newly merged `main` before
+  publication. This kept AI-assisted changes isolated to one behavioral outcome
+  and made human review of both code and test evidence straightforward.
+
 ## Generated output rejected or corrected
 
 - An initial AI attempt changed several areas before the requested workflow was
