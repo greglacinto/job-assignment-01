@@ -156,3 +156,100 @@ def test_event_identity_migration_preserves_existing_audit_rows(tmp_path) -> Non
         ]
     finally:
         store.close()
+
+
+def test_delayed_lower_sequence_does_not_move_current_state_backward() -> None:
+    store = TelemetryStore(":memory:")
+    try:
+        store.register_boot(BootRegistrationInput(deviceId="device-01", bootId="boot-a"))
+        store.ingest(
+            telemetry(
+                sequence=2,
+                deviceTime="2026-08-12T09:00:00+00:00",
+                value=22.0,
+            ),
+            "2026-08-12T09:00:01+00:00",
+        )
+
+        delayed = store.ingest(
+            telemetry(
+                sequence=1,
+                deviceTime="2026-08-13T09:00:00+00:00",
+                value=21.0,
+            ),
+            "2026-08-12T09:00:02+00:00",
+        )
+
+        assert delayed.duplicate is False
+        assert delayed.current_changed is False
+        assert len(store.list_events(10)) == 2
+        current = store.list_current_states()[0]
+        assert current.sequence == 2
+        assert current.value == 22.0
+    finally:
+        store.close()
+
+
+def test_higher_sequence_advances_state_despite_earlier_device_clock() -> None:
+    store = TelemetryStore(":memory:")
+    try:
+        store.register_boot(BootRegistrationInput(deviceId="device-01", bootId="boot-a"))
+        store.ingest(
+            telemetry(
+                sequence=1,
+                deviceTime="2026-08-13T09:00:00+00:00",
+                value=21.0,
+            ),
+            "2026-08-12T09:00:01+00:00",
+        )
+
+        next_event = store.ingest(
+            telemetry(
+                sequence=2,
+                deviceTime="2026-08-12T09:00:00+00:00",
+                value=22.0,
+            ),
+            "2026-08-12T09:00:02+00:00",
+        )
+
+        assert next_event.current_changed is True
+        current = store.list_current_states()[0]
+        assert current.sequence == 2
+        assert current.value == 22.0
+    finally:
+        store.close()
+
+
+def test_older_boot_does_not_replace_state_from_newer_generation() -> None:
+    store = TelemetryStore(":memory:")
+    try:
+        store.register_boot(BootRegistrationInput(deviceId="device-01", bootId="boot-a"))
+        store.register_boot(BootRegistrationInput(deviceId="device-01", bootId="boot-b"))
+        store.ingest(
+            telemetry(
+                bootId="boot-b",
+                deviceTime="2026-08-12T09:00:00+00:00",
+                value=22.0,
+            ),
+            "2026-08-12T09:00:01+00:00",
+        )
+
+        older_boot = store.ingest(
+            telemetry(
+                bootId="boot-a",
+                sequence=99,
+                deviceTime="2026-08-13T09:00:00+00:00",
+                value=99.0,
+            ),
+            "2026-08-12T09:00:02+00:00",
+        )
+
+        assert older_boot.duplicate is False
+        assert older_boot.current_changed is False
+        assert len(store.list_events(10)) == 2
+        current = store.list_current_states()[0]
+        assert current.boot_id == "boot-b"
+        assert current.generation == 2
+        assert current.value == 22.0
+    finally:
+        store.close()
