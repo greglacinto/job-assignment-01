@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
-from telemetry_gateway.api import create_app
+from telemetry_gateway.api import STATIC_DIR, create_app
 
 
 def test_health_and_dashboard_are_local(tmp_path) -> None:
@@ -64,3 +64,12 @@ def test_registers_boot_ingests_and_lists_state(tmp_path) -> None:
         assert devices.status_code == 200
         assert len(devices.json()["devices"]) == 1
         assert devices.json()["devices"][0]["value"] == 21.4
+
+
+def test_dashboard_refreshes_snapshot_after_websocket_connects() -> None:
+    script = (STATIC_DIR / "app.js").read_text()
+    open_handler_start = script.index("socket.addEventListener('open'")
+    message_handler_start = script.index("socket.addEventListener('message'")
+    open_handler = script[open_handler_start:message_handler_start]
+
+    assert "await loadSnapshot()" in open_handler

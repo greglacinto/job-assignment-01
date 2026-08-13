@@ -6,6 +6,8 @@ const errorBox = document.querySelector('#error');
 let stopped = false;
 let retryTimer;
 let socket;
+let snapshotRefreshes = 0;
+const pendingUpdates = [];
 
 function stateKey(state) {
   return `${state.deviceId}:${state.metric}`;
@@ -55,27 +57,42 @@ function setError(message) {
 }
 
 async function loadSnapshot() {
-  const response = await fetch('/api/devices');
-  if (!response.ok) {
-    throw new Error(`Snapshot request failed with ${response.status}.`);
-  }
+  snapshotRefreshes += 1;
+  try {
+    const response = await fetch('/api/devices');
+    if (!response.ok) {
+      throw new Error(`Snapshot request failed with ${response.status}.`);
+    }
 
-  const body = await response.json();
-  states.clear();
-  for (const state of body.devices) {
-    states.set(stateKey(state), state);
+    const body = await response.json();
+    states.clear();
+    for (const state of body.devices) {
+      states.set(stateKey(state), state);
+    }
+  } finally {
+    snapshotRefreshes -= 1;
+    if (snapshotRefreshes === 0) {
+      for (const state of pendingUpdates.splice(0)) {
+        states.set(stateKey(state), state);
+      }
+      render();
+    }
   }
-  render();
 }
 
 function connect() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   socket = new WebSocket(`${protocol}//${window.location.host}/ws`);
 
-  socket.addEventListener('open', () => {
+  socket.addEventListener('open', async () => {
     status.textContent = 'Realtime connected';
     status.className = 'status online';
-    setError('');
+    try {
+      await loadSnapshot();
+      setError('');
+    } catch (error) {
+      setError(error.message);
+    }
   });
 
   socket.addEventListener('message', (event) => {
@@ -83,8 +100,12 @@ function connect() {
     if (message.type !== 'device.state.changed') {
       return;
     }
-    states.set(stateKey(message.data), message.data);
-    render();
+    if (snapshotRefreshes > 0) {
+      pendingUpdates.push(message.data);
+    } else {
+      states.set(stateKey(message.data), message.data);
+      render();
+    }
   });
 
   socket.addEventListener('error', () => {
