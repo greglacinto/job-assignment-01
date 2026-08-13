@@ -62,7 +62,46 @@ def migration_001(connection: sqlite3.Connection) -> None:
     )
 
 
-MIGRATIONS: list[Migration] = [(1, migration_001)]
+def migration_002(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE telemetry_events_v2 (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            device_id TEXT NOT NULL,
+            boot_id TEXT NOT NULL,
+            generation INTEGER NOT NULL,
+            sequence INTEGER NOT NULL,
+            device_time TEXT NOT NULL,
+            received_at TEXT NOT NULL,
+            metric TEXT NOT NULL,
+            value REAL NOT NULL,
+            UNIQUE (device_id, boot_id, sequence),
+            FOREIGN KEY (device_id, boot_id)
+                REFERENCES device_boots (device_id, boot_id)
+        )
+        """
+    )
+    connection.execute(
+        """
+        INSERT INTO telemetry_events_v2
+            (id, device_id, boot_id, generation, sequence, device_time,
+             received_at, metric, value)
+        SELECT id, device_id, boot_id, generation, sequence, device_time,
+               received_at, metric, value
+        FROM telemetry_events
+        """
+    )
+    connection.execute("DROP TABLE telemetry_events")
+    connection.execute("ALTER TABLE telemetry_events_v2 RENAME TO telemetry_events")
+    connection.execute(
+        """
+        CREATE INDEX telemetry_events_received_at_idx
+        ON telemetry_events (received_at DESC)
+        """
+    )
+
+
+MIGRATIONS: list[Migration] = [(1, migration_001), (2, migration_002)]
 
 
 def apply_migrations(connection: sqlite3.Connection) -> None:
