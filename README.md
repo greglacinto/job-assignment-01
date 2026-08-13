@@ -50,6 +50,18 @@ In `AI_USAGE.md`, record:
 - Incorrect or unsuitable output that you rejected or corrected
 - The checks that you used to verify AI-generated changes
 
+### Agentic development evidence
+
+The screenshot below captures the completed dashboard running alongside the
+Codex workflow. It also shows human-in-the-loop scope control: a technically
+reasonable dependency suggestion was reviewed and explicitly rejected because
+it was outside the requested repair outcomes.
+
+![Codex workflow beside the connected local telemetry dashboard](docs/screenshots/agentic-development.png)
+
+See [`AI_USAGE.md`](AI_USAGE.md) for the prompts, rejected output, test-first
+verification, and persistent `AGENTS.md` context used during implementation.
+
 ### Engineering constraints
 
 - Keep all runtime components on one local machine.

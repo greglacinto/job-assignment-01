@@ -94,3 +94,6 @@
 - Browser smoke checks confirmed the dashboard loaded, WebSocket status became
   connected, live simulator values rendered, and an authoritative state
   committed while the server was offline appeared after snapshot reload.
+- `docs/screenshots/agentic-development.png` records the connected dashboard
+  beside the active Codex workflow, including an example where I rejected an
+  out-of-scope AI suggestion rather than expanding the assignment.
